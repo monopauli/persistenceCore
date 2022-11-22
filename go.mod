@@ -1,4 +1,5 @@
-module github.com/persistenceOne/persistenceCore/v5
+module github.com/monopauli/persistenceCore
+
 
 go 1.19
 
@@ -136,3 +137,4 @@ replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
 replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.7
+

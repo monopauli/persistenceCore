@@ -105,6 +105,7 @@ import (
 	ibckeeper "github.com/cosmos/ibc-go/v3/modules/core/keeper"
 	"github.com/gogo/protobuf/grpc"
 	"github.com/gorilla/mux"
+	upgrades "github.com/monopauli/persistenceCore/app/upgrades/v5.1.0"
 	"github.com/persistenceOne/persistence-sdk/x/epochs"
 	epochskeeper "github.com/persistenceOne/persistence-sdk/x/epochs/keeper"
 	epochstypes "github.com/persistenceOne/persistence-sdk/x/epochs/types"
@@ -127,7 +128,7 @@ import (
 	tendermintproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendermintdb "github.com/tendermint/tm-db"
 
-	appparams "github.com/persistenceOne/persistenceCore/v5/app/params"
+	appparams "github.com/monopauli/persistenceCore/app/params"
 )
 
 var DefaultNodeHome string
@@ -808,31 +809,18 @@ func NewApplication(
 			ctx.Logger().Info("start to run module migrations...")
 
 			// RunMigrations twice is just a way to make auth module's migrates after staking
+
+			//add more upgrade instructions
+			ctx.Logger().Info("Running revert of tombstoning")
+			err := upgrades.RevertCosTombstoning(ctx, &app.SlashingKeeper, &app.MintKeeper, &bankkeeper.BaseKeeper{}, &app.StakingKeeper)
+			if err != nil {
+				panic(fmt.Sprintf("failed to revert tombstoning: %s", err))
+			}
+
 			newVM, err := app.moduleManager.RunMigrations(ctx, app.configurator, fromVM)
 			if err != nil {
 				return nil, err
 			}
-			//add more upgrade instructions
-			failAndRemoveUnbondings := func(ctx sdk.Context, k lscosmoskeeper.Keeper, startEpoch, endEpoch int64) {
-				for i := startEpoch; i < endEpoch; i = i + lscosmostypes.UndelegationEpochNumberFactor {
-					icurEpoch := lscosmostypes.CurrentUnbondingEpoch(i)
-					if icurEpoch < endEpoch {
-						//FAIL icurEpoch.
-						hostAccountUndelegationForEpoch, err := k.GetHostAccountUndelegationForEpoch(ctx, icurEpoch)
-						if err != nil {
-							ctx.Logger().Error(fmt.Sprintf("Error fetching %d epoch host undelegation with err: %s", icurEpoch, err.Error()))
-						}
-						err = k.RemoveHostAccountUndelegation(ctx, icurEpoch)
-						if err != nil {
-							ctx.Logger().Error(fmt.Sprintf("Error failing %d epoch remove undelegation with err: %s", icurEpoch, err.Error()))
-						}
-						k.FailUnbondingEpochCValue(ctx, icurEpoch, hostAccountUndelegationForEpoch.TotalUndelegationAmount)
-						k.Logger(ctx).Info(fmt.Sprintf("Successfully failed unbonding for undelegationEpoch: %v", icurEpoch))
-
-					}
-				}
-			}
-			failAndRemoveUnbondings(ctx, app.LSCosmosKeeper, 1, 5)
 
 			return newVM, nil
 		},
@@ -874,6 +862,12 @@ func NewApplication(
 	return app
 }
 
+func (app *Application) CreateUpgradeHandler(mm *module.Manager, configurator module.Configurator) upgradetypes.UpgradeHandler {
+	return func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
+
+		return mm.RunMigrations(ctx, configurator, vm)
+	}
+}
 func (app Application) ApplicationCodec() codec.Codec {
 	return app.applicationCodec
 }
