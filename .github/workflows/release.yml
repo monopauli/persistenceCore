@@ -32,7 +32,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           files: release/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   docker:
     runs-on: ubuntu-latest
@@ -55,7 +55,7 @@ jobs:
         with:
           platform: linux/arm64,linux/amd64
           git-ref: ${{ steps.branch-name.outputs.current_branch }}
-          registry: docker.io/persistenceone
+          registry: docker.io/monopauli
           tag: ${{ github.ref_name }}
           chain: persistencecore
           dockerfile: cosmos
